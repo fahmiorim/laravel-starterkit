@@ -18,7 +18,6 @@
         <form action="{{ route('admin.roles.update', $role->id) }}" method="POST" onsubmit="return submitForm(this)">
             @csrf
             @method('PUT')
-            <input type="hidden" name="_method" value="PUT">
             <div class="p-6 space-y-6">
                 <!-- Nama Role -->
                 <div class="mb-6">
@@ -71,13 +70,15 @@
 
             <!-- Footer -->
             <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-200 dark:border-gray-700 flex justify-between">
-                <form action="{{ route('admin.roles.destroy', $role->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus role ini?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                        <i class="fas fa-trash mr-2"></i> Hapus Role
-                    </button>
-                </form>
+                <div>
+                    <form action="{{ route('admin.roles.destroy', $role->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus role ini?');" class="inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            <i class="fas fa-trash mr-2"></i> Hapus Role
+                        </button>
+                    </form>
+                </div>
                 <div class="space-x-3">
                     <a href="{{ route('admin.roles.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                         Batal

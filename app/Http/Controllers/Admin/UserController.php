@@ -127,6 +127,7 @@ class UserController extends Controller
             ],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'phone' => ['nullable', 'string', 'max:20'],
+            'is_active' => ['required', 'boolean'],
             'roles' => ['required', 'array'],
             'roles.*' => ['exists:roles,id']
         ]);
@@ -135,6 +136,7 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
+            'is_active' => $request->boolean('is_active'),
         ];
 
         // Update password if provided

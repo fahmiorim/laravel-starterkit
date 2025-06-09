@@ -7,6 +7,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
 {
@@ -115,7 +116,6 @@ class RoleController extends Controller
         // Log the incoming request data for debugging
         \Log::info('Updating role', [
             'role_id' => $id,
-            'request_data' => $request->all(),
             'user_id' => auth()->id()
         ]);
 

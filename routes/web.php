@@ -9,17 +9,6 @@ use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ActivityLogController;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
-
 // Homepage
 Route::get('/', function () {
     return view('welcome');
@@ -27,6 +16,7 @@ Route::get('/', function () {
 
 // Authentication Routes
 require __DIR__.'/auth.php';
+
 
 // Dashboard Routes
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -47,10 +37,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('roles', RoleController::class);
         
         // Permissions Management
+        Route::resource('permissions', PermissionController::class);
         
-        
-        // Settings
-        Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+        // Settings Management
+        Route::get('/settings/{group?}', [SettingsController::class, 'index'])->name('settings.index')->where('group', 'general|company|social');
+        Route::match(['post', 'put'], '/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/settings/remove-image', [SettingsController::class, 'removeImage'])->name('settings.remove-image');
         
         // Activity Log
         Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log');

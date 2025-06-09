@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
+        
+        // Tambahkan middleware CORS ke grup global
+        $middleware->append(\App\Http\Middleware\Cors::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
