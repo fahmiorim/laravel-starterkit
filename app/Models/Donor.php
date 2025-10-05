@@ -36,6 +36,14 @@ class Donor extends Model
     }
 
     /**
+     * Get the last donation history for this donor.
+     */
+    public function lastDonation()
+    {
+        return $this->hasOne(DonorHistory::class)->latestOfMany('tanggal_donor');
+    }
+
+    /**
      * Get the donor card associated with the donor.
      */
     public function donorCard()

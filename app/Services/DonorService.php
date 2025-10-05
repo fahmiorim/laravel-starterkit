@@ -7,11 +7,14 @@ use App\Events\DonorUpdated;
 use App\Events\DonorEligibilityChecked;
 use App\Models\Donor;
 use App\Repositories\Contracts\DonorRepositoryInterface;
+use App\Services\Contracts\DonorServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
-class DonorService
+class DonorService implements DonorServiceInterface
 {
     protected $donorRepository;
 
@@ -23,7 +26,7 @@ class DonorService
     /**
      * Mendapatkan semua data donor
      */
-    public function getAllDonors()
+    public function getAllDonors(): Collection
     {
         return $this->donorRepository->all();
     }
@@ -31,7 +34,7 @@ class DonorService
     /**
      * Mendapatkan data donor dengan pagination
      */
-    public function getPaginatedDonors(int $perPage = 15)
+    public function getPaginatedDonors(int $perPage = 15): LengthAwarePaginator
     {
         return $this->donorRepository->paginate($perPage);
     }
@@ -39,7 +42,7 @@ class DonorService
     /**
      * Mencari donor berdasarkan query
      */
-    public function searchDonors(string $query)
+    public function searchDonors(string $query): Collection
     {
         return $this->donorRepository->search($query);
     }
@@ -82,12 +85,18 @@ class DonorService
     /**
      * Memperbarui data donor
      */
-    public function updateDonor(Donor $donor, array $data): bool
+    public function updateDonor(int $id, array $data): bool
     {
-        return DB::transaction(function () use ($donor, $data) {
+        return DB::transaction(function () use ($id, $data) {
             // Format tanggal lahir jika ada
             if (isset($data['birth_date'])) {
                 $data['birth_date'] = Carbon::createFromFormat('d/m/Y', $data['birth_date'])->format('Y-m-d');
+            }
+
+            $donor = $this->donorRepository->find($id);
+            
+            if (!$donor) {
+                return false;
             }
 
             $updated = $this->donorRepository->update($donor, $data);
@@ -103,8 +112,14 @@ class DonorService
     /**
      * Menghapus data donor
      */
-    public function deleteDonor(Donor $donor): bool
+    public function deleteDonor(int $id): bool
     {
+        $donor = $this->donorRepository->find($id);
+        
+        if (!$donor) {
+            return false;
+        }
+
         return $this->donorRepository->delete($donor);
     }
 
@@ -146,16 +161,15 @@ class DonorService
         return [
             'is_eligible' => $isEligible,
             'reason' => $reason,
-            'next_eligible_date' => $nextEligibleDate ? $nextEligibleDate->format('Y-m-d') : null,
             'last_donation_date' => $lastDonationDate,
             'donor' => $donor
         ];
     }
 
     /**
-     * Mendapatkan riwayat donasi
+     * Mendapatkan riwayat donasi donor
      */
-    public function getDonationHistory(int $donorId, int $limit = 10)
+    public function getDonationHistory(int $donorId, int $limit = 10): Collection
     {
         return $this->donorRepository->getDonationHistory($donorId, $limit);
     }
@@ -163,7 +177,7 @@ class DonorService
     /**
      * Mendapatkan daftar donor yang memenuhi syarat untuk didonorkan
      */
-    public function getEligibleDonors()
+    public function getEligibleDonors(): Collection
     {
         return $this->donorRepository->getEligibleDonors();
     }
@@ -171,7 +185,7 @@ class DonorService
     /**
      * Mendapatkan daftar donor berdasarkan golongan darah
      */
-    public function getDonorsByBloodType(string $bloodType, string $rhesus)
+    public function getDonorsByBloodType(string $bloodType, string $rhesus): Collection
     {
         return $this->donorRepository->getDonorsByBloodType($bloodType, $rhesus);
     }
@@ -179,7 +193,7 @@ class DonorService
     /**
      * Mengaktifkan/menonaktifkan status donor
      */
-    public function toggleDonorStatus(Donor $donor, string $status): bool
+    public function toggleDonorStatus(int $id, string $status): bool
     {
         $allowedStatuses = ['active', 'inactive', 'banned'];
         
@@ -187,6 +201,41 @@ class DonorService
             throw new \InvalidArgumentException('Status donor tidak valid.');
         }
 
+        $donor = $this->donorRepository->find($id);
+        
+        if (!$donor) {
+            return false;
+        }
+
         return $this->donorRepository->update($donor, ['status' => $status]);
+    }
+
+    /**
+     * Mendapatkan donor dengan filter
+     */
+    public function getDonorsWithFilters(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        $query = Donor::query();
+
+        if (isset($filters['blood_type']) && !empty($filters['blood_type'])) {
+            $query->where('blood_type', $filters['blood_type']);
+        }
+
+        if (isset($filters['rhesus']) && !empty($filters['rhesus'])) {
+            $query->where('rhesus', $filters['rhesus']);
+        }
+
+        if (isset($filters['status']) && !empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['search']) && !empty($filters['search'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('name', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('nik', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        return $query->latest()->paginate($perPage);
     }
 }

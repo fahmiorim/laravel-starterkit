@@ -5,18 +5,19 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreBloodStockTransactionRequest;
 use App\Http\Requests\UpdateBloodStockTransactionRequest;
-use App\Models\BloodStock;
 use App\Models\BloodStockTransaction;
-use App\Models\User;
+use App\Services\Contracts\BloodStockTransactionServiceInterface;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class BloodStockTransactionController extends Controller
 {
     use AuthorizesRequests;
-    
+
+    public function __construct(
+        private readonly BloodStockTransactionServiceInterface $transactionService
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -24,9 +25,9 @@ class BloodStockTransactionController extends Controller
     {
         $this->authorize('viewAny', BloodStockTransaction::class);
 
-        $transactions = BloodStockTransaction::with(['bloodStock', 'creator', 'approver'])
-            ->latest()
-            ->paginate(15);
+        $transactions = $this->transactionService->paginate(
+            $request->only('status')
+        );
 
         return view('admin.blood-stock-transactions.index', compact('transactions'));
     }
@@ -38,10 +39,9 @@ class BloodStockTransactionController extends Controller
     {
         $this->authorize('create', BloodStockTransaction::class);
 
-        $bloodStocks = BloodStock::all();
-        $users = User::all();
-        
-        return view('admin.blood-stock-transactions.create', compact('bloodStocks', 'users'));
+        $formData = $this->transactionService->getFormData();
+
+        return view('admin.blood-stock-transactions.create', $formData);
     }
 
     /**
@@ -51,34 +51,14 @@ class BloodStockTransactionController extends Controller
     {
         $this->authorize('create', BloodStockTransaction::class);
 
-        $validated = $request->validated();
-        $validated['created_by'] = Auth::id();
-        $validated['status'] = 'pending';
-
-        // If the creator is an admin, automatically approve
-        if ($request->user()->hasRole('admin')) {
-            $validated['approved_by'] = Auth::id();
-            $validated['approved_at'] = now();
-            $validated['status'] = 'approved';
-        }
-
-        DB::beginTransaction();
-        
         try {
-            $transaction = BloodStockTransaction::create($validated);
-            
-            // Update stok jika transaksi disetujui
-            if ($transaction->isApproved()) {
-                $this->updateStock($transaction);
-            }
-            
-            DB::commit();
-            
+            $transaction = $this->transactionService->create($request->validated(), $request->user());
+
             return redirect()->route('admin.blood-stock-transactions.index')
                 ->with('success', 'Transaksi berhasil ditambahkan' . ($transaction->isApproved() ? ' dan stok telah diperbarui' : ''));
-                
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\Throwable $e) {
+            report($e);
+
             return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
@@ -89,9 +69,9 @@ class BloodStockTransactionController extends Controller
     public function show(BloodStockTransaction $bloodStockTransaction)
     {
         $this->authorize('view', $bloodStockTransaction);
-        
+
         $bloodStockTransaction->load(['bloodStock', 'creator', 'approver']);
-        
+
         return view('admin.blood-stock-transactions.show', compact('bloodStockTransaction'));
     }
 
@@ -101,16 +81,18 @@ class BloodStockTransactionController extends Controller
     public function edit(BloodStockTransaction $bloodStockTransaction)
     {
         $this->authorize('update', $bloodStockTransaction);
-        
+
         if ($bloodStockTransaction->isApproved()) {
             return redirect()->route('admin.blood-stock-transactions.show', $bloodStockTransaction)
                 ->with('error', 'Transaksi yang sudah disetujui tidak dapat diedit');
         }
-        
-        $bloodStocks = BloodStock::all();
-        $users = User::all();
-        
-        return view('admin.blood-stock-transactions.edit', compact('bloodStockTransaction', 'bloodStocks', 'users'));
+
+        $formData = $this->transactionService->getFormData();
+
+        return view('admin.blood-stock-transactions.edit', array_merge(
+            ['bloodStockTransaction' => $bloodStockTransaction],
+            $formData
+        ));
     }
 
     /**
@@ -119,30 +101,19 @@ class BloodStockTransactionController extends Controller
     public function update(UpdateBloodStockTransactionRequest $request, BloodStockTransaction $bloodStockTransaction)
     {
         $this->authorize('update', $bloodStockTransaction);
-        
+
         if ($bloodStockTransaction->isApproved()) {
             return back()->with('error', 'Transaksi yang sudah disetujui tidak dapat diubah');
         }
-        
-        $validated = $request->validated();
-        
-        DB::beginTransaction();
-        
+
         try {
-            $bloodStockTransaction->update($validated);
-            
-            // Jika transaksi disetujui, update stok
-            if ($bloodStockTransaction->isApproved()) {
-                $this->updateStock($bloodStockTransaction);
-            }
-            
-            DB::commit();
-            
-            return redirect()->route('admin.blood-stock-transactions.show', $bloodStockTransaction)
-                ->with('success', 'Transaksi berhasil diperbarui' . ($bloodStockTransaction->isApproved() ? ' dan stok telah diperbarui' : ''));
-                
-        } catch (\Exception $e) {
-            DB::rollBack();
+            $transaction = $this->transactionService->update($bloodStockTransaction, $request->validated());
+
+            return redirect()->route('admin.blood-stock-transactions.show', $transaction)
+                ->with('success', 'Transaksi berhasil diperbarui' . ($transaction->isApproved() ? ' dan stok telah diperbarui' : ''));
+        } catch (\Throwable $e) {
+            report($e);
+
             return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
@@ -153,99 +124,84 @@ class BloodStockTransactionController extends Controller
     public function destroy(BloodStockTransaction $bloodStockTransaction)
     {
         $this->authorize('delete', $bloodStockTransaction);
-        
+
         if ($bloodStockTransaction->isApproved()) {
             return back()->with('error', 'Transaksi yang sudah disetujui tidak dapat dihapus');
         }
-        
-        $bloodStockTransaction->delete();
-        
-        return redirect()->route('admin.blood-stock-transactions.index')
-            ->with('success', 'Transaksi berhasil dihapus');
+
+        try {
+            $this->transactionService->delete($bloodStockTransaction);
+
+            return redirect()->route('admin.blood-stock-transactions.index')
+                ->with('success', 'Transaksi berhasil dihapus');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
-    
+
     /**
      * Approve the specified transaction.
      */
     public function approve(Request $request, BloodStockTransaction $bloodStockTransaction)
     {
         $this->authorize('approve', $bloodStockTransaction);
-        
+
         if ($bloodStockTransaction->isApproved()) {
             return back()->with('error', 'Transaksi sudah disetujui sebelumnya');
         }
-        
+
         if ($bloodStockTransaction->isRejected()) {
             return back()->with('error', 'Transaksi yang sudah ditolak tidak dapat disetujui');
         }
-        
-        DB::beginTransaction();
-        
+
         try {
-            $bloodStockTransaction->update([
-                'status' => 'approved',
-                'approved_by' => Auth::id(),
-                'approved_at' => now(),
-                'rejection_reason' => null,
-            ]);
-            
-            // Update stok
-            $this->updateStock($bloodStockTransaction);
-            
-            DB::commit();
-            
+            $this->transactionService->approve($bloodStockTransaction, $request->user());
+
             // TODO: Kirim notifikasi ke pembuat transaksi
-            
+
             return back()->with('success', 'Transaksi berhasil disetujui dan stok telah diperbarui');
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\Throwable $e) {
+            report($e);
+
             return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Reject the specified transaction.
      */
     public function reject(Request $request, BloodStockTransaction $bloodStockTransaction)
     {
         $this->authorize('approve', $bloodStockTransaction);
-        
+
         $request->validate([
             'rejection_reason' => 'required|string|max:1000',
         ]);
-        
+
         if ($bloodStockTransaction->isApproved()) {
             return back()->with('error', 'Transaksi yang sudah disetujui tidak dapat ditolak');
         }
-        
+
         if ($bloodStockTransaction->isRejected()) {
             return back()->with('error', 'Transaksi sudah ditolak sebelumnya');
         }
-        
-        $bloodStockTransaction->update([
-            'status' => 'rejected',
-            'approved_by' => Auth::id(),
-            'approved_at' => now(),
-            'rejection_reason' => $request->rejection_reason,
-        ]);
-        
-        // TODO: Kirim notifikasi ke pembuat transaksi
-        
-        return back()->with('success', 'Transaksi berhasil ditolak');
-    }
-    
-    /**
-     * Update stock based on transaction.
-     */
-    protected function updateStock(BloodStockTransaction $transaction)
-    {
-        $bloodStock = $transaction->bloodStock;
-        
-        if ($transaction->type === 'in') {
-            $bloodStock->increment('quantity', $transaction->quantity);
-        } else {
-            $bloodStock->decrement('quantity', $transaction->quantity);
+
+        try {
+            $this->transactionService->reject(
+                $bloodStockTransaction,
+                $request->user(),
+                $request->rejection_reason
+            );
+
+            // TODO: Kirim notifikasi ke pembuat transaksi
+
+            return back()->with('success', 'Transaksi berhasil ditolak');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
 }

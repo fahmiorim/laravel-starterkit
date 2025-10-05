@@ -4,24 +4,29 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
+use App\Services\Contracts\UserServiceInterface;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules;
-use Inertia\Inertia;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    public function __construct(
+        protected UserServiceInterface $userService
+    ) {}
+
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request): View
     {
-        $users = User::with('roles')->latest()->paginate(10);
-        
+        $users = $this->userService->getAllUsers(
+            $request->only(['search', 'role', 'is_active']),
+            10
+        );
+
         return view('admin.users.index', [
             'users' => $users
         ]);
@@ -29,13 +34,11 @@ class UserController extends Controller
 
     /**
      * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(): View
     {
         $roles = Role::all();
-        
+
         return view('admin.users.create', [
             'roles' => $roles
         ]);
@@ -43,31 +46,25 @@ class UserController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
             'phone' => ['nullable', 'string', 'max:20'],
             'roles' => ['required', 'array'],
             'roles.*' => ['exists:roles,id']
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'phone' => $request->phone,
-        ]);
+        $userData = $request->only(['name', 'email', 'password', 'phone']);
+        $userData['is_active'] = true;
 
-        // Assign roles
-        $roles = Role::whereIn('id', $request->roles)->get();
-        $user->syncRoles($roles);
+        $user = $this->userService->createUser($userData);
+
+        // Assign roles using service
+        $this->userService->assignRoles($user->id, $request->roles);
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User created successfully.');
@@ -75,14 +72,15 @@ class UserController extends Controller
 
     /**
      * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(int $id): View
     {
-        $user = User::with('roles', 'permissions')->findOrFail($id);
-        
+        $user = $this->userService->getUserWithRolesAndPermissions($id);
+
+        if (!$user) {
+            abort(404);
+        }
+
         return view('admin.users.show', [
             'user' => $user
         ]);
@@ -90,15 +88,17 @@ class UserController extends Controller
 
     /**
      * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(int $id): View
     {
-        $user = User::with('roles')->findOrFail($id);
+        $user = $this->userService->getUserById($id);
+
+        if (!$user) {
+            abort(404);
+        }
+
         $roles = Role::all();
-        
+
         return view('admin.users.edit', [
             'user' => $user,
             'roles' => $roles
@@ -107,15 +107,9 @@ class UserController extends Controller
 
     /**
      * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): RedirectResponse
     {
-        $user = User::findOrFail($id);
-        
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => [
@@ -123,53 +117,69 @@ class UserController extends Controller
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users')->ignore($user->id)
+                \Illuminate\Validation\Rule::unique('users')->ignore($id)
             ],
-            'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
+            'password' => ['nullable', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
             'phone' => ['nullable', 'string', 'max:20'],
             'is_active' => ['required', 'boolean'],
             'roles' => ['required', 'array'],
             'roles.*' => ['exists:roles,id']
         ]);
 
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'is_active' => $request->boolean('is_active'),
-        ];
+        $userData = $request->only(['name', 'email', 'phone', 'is_active']);
 
-        // Update password if provided
+        // Add password if provided
         if ($request->filled('password')) {
-            $data['password'] = Hash::make($request->password);
+            $userData['password'] = $request->password;
         }
 
-        $user->update($data);
+        $success = $this->userService->updateUser($id, $userData);
 
-        // Sync roles
-        $roles = Role::whereIn('id', $request->roles)->get();
-        $user->syncRoles($roles);
+        if (!$success) {
+            return back()->with('error', 'Failed to update user.');
+        }
+
+        // Sync roles using service
+        $this->userService->assignRoles($id, $request->roles);
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User updated successfully.');
     }
 
     /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * Toggle user status.
      */
-    public function destroy($id)
+    public function toggleStatus(int $id): RedirectResponse
     {
-        // Prevent deleting yourself
-        if (auth()->id() == $id) {
-            return redirect()->back()
-                ->with('error', 'You cannot delete your own account.');
+        // Prevent toggling your own status
+        if (Auth::id() == $id) {
+            return back()->with('error', 'You cannot change your own status.');
         }
 
-        $user = User::findOrFail($id);
-        $user->delete();
+        $success = $this->userService->toggleUserStatus($id);
+
+        if (!$success) {
+            return back()->with('error', 'Failed to toggle user status.');
+        }
+
+        return back()->with('success', 'User status updated successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(int $id): RedirectResponse
+    {
+        // Prevent deleting yourself
+        if (Auth::id() == $id) {
+            return back()->with('error', 'You cannot delete your own account.');
+        }
+
+        $success = $this->userService->deleteUser($id);
+
+        if (!$success) {
+            return back()->with('error', 'Failed to delete user.');
+        }
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User deleted successfully.');

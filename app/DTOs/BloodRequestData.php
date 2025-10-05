@@ -19,6 +19,23 @@ class BloodRequestData
         public readonly ?int $processed_by = null
     ) {}
 
+    public static function fromArray(array $data, ?int $processedBy = null): self
+    {
+        return new self(
+            patient_id: (int) $data['patient_id'],
+            blood_type_id: (int) $data['blood_type_id'],
+            quantity: (int) $data['quantity'],
+            status: $data['status'],
+            notes: $data['notes'] ?? null,
+            hospital_name: $data['hospital_name'] ?? null,
+            hospital_address: $data['hospital_address'] ?? null,
+            required_date: isset($data['required_date']) && $data['required_date'] !== null
+                ? Carbon::parse($data['required_date'])
+                : null,
+            processed_by: $processedBy
+        );
+    }
+
     public static function fromRequest(Request $request): self
     {
         $validated = $request->validate([
@@ -32,24 +49,9 @@ class BloodRequestData
             'required_date' => 'nullable|date',
         ]);
 
-        return new self(
-            patient_id: (int)$validated['patient_id'],
-            blood_type_id: (int)$validated['blood_type_id'],
-            quantity: (int)$validated['quantity'],
-            status: $validated['status'],
-            notes: $validated['notes'] ?? null,
-            hospital_name: $validated['hospital_name'] ?? null,
-            hospital_address: $validated['hospital_address'] ?? null,
-            required_date: isset($validated['required_date']) 
-                ? Carbon::parse($validated['required_date'])
-                : null,
-            processed_by: $request->user()?->id
-        );
+        return self::fromArray($validated, $request->user()?->id);
     }
 
-    /**
-     * Convert DTO to array
-     */
     public function toArray(): array
     {
         return [

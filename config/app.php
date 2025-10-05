@@ -177,6 +177,7 @@ return [
         App\Providers\SettingServiceProvider::class,
         App\Providers\RepositoryServiceProvider::class,
         Barryvdh\DomPDF\ServiceProvider::class,
+        Spatie\Permission\PermissionServiceProvider::class,
     ],
 
     /*

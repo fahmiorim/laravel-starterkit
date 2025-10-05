@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Services\SettingService;
+use App\Services\SettingsService;
 use Illuminate\Support\ServiceProvider;
 
 class SettingServiceProvider extends ServiceProvider
@@ -13,11 +13,11 @@ class SettingServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton('setting', function ($app) {
-            return new SettingService();
+            return new SettingsService();
         });
-        
+
         // Register the facade
-        $this->app->alias('setting', SettingService::class);
+        $this->app->alias('setting', SettingsService::class);
     }
 
     /**

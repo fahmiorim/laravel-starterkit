@@ -3,23 +3,29 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Spatie\Permission\Models\Role;
+use App\Services\Contracts\RoleServiceInterface;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
 {
+    public function __construct(
+        protected RoleServiceInterface $roleService
+    ) {}
+
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request): View
     {
-        $roles = Role::with('permissions')->latest()->paginate(10);
-        
+        $roles = $this->roleService->getAllRoles(
+            $request->only(['search']),
+            10
+        );
+
         return view('admin.roles.index', [
             'roles' => $roles
         ]);
@@ -27,13 +33,11 @@ class RoleController extends Controller
 
     /**
      * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(): View
     {
         $permissions = Permission::all();
-        
+
         return view('admin.roles.create', [
             'permissions' => $permissions
         ]);
@@ -41,47 +45,43 @@ class RoleController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:roles'],
+            'group' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:500'],
             'permissions' => ['required', 'array'],
             'permissions.*' => ['exists:permissions,id']
         ]);
 
-        DB::beginTransaction();
-        
-        try {
-            $role = Role::create(['name' => $request->name]);
-            $permissions = Permission::whereIn('id', $request->permissions)->get();
-            $role->syncPermissions($permissions);
-            
-            DB::commit();
-            
-            return redirect()->route('admin.roles.index')
-                ->with('success', 'Role created successfully.');
-                
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()
-                ->with('error', 'Failed to create role. Please try again.');
-        }
+        $roleData = [
+            'name' => $request->name,
+            'group' => $request->group,
+            'description' => $request->description,
+        ];
+
+        $role = $this->roleService->createRole($roleData);
+
+        // Assign permissions using service
+        $this->roleService->assignPermissions($role->id, $request->permissions);
+
+        return redirect()->route('admin.roles.index')
+            ->with('success', 'Role created successfully.');
     }
 
     /**
      * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(int $id): View
     {
-        $role = Role::with('permissions')->findOrFail($id);
-        
+        $role = $this->roleService->getRoleWithPermissions($id);
+
+        if (!$role) {
+            abort(404);
+        }
+
         return view('admin.roles.show', [
             'role' => $role
         ]);
@@ -89,15 +89,17 @@ class RoleController extends Controller
 
     /**
      * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(int $id): View
     {
-        $role = Role::with('permissions')->findOrFail($id);
+        $role = $this->roleService->getRoleWithPermissions($id);
+
+        if (!$role) {
+            abort(404);
+        }
+
         $permissions = Permission::all();
-        
+
         return view('admin.roles.edit', [
             'role' => $role,
             'permissions' => $permissions
@@ -106,28 +108,24 @@ class RoleController extends Controller
 
     /**
      * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): RedirectResponse
     {
-        // Log the incoming request data for debugging
-        \Log::info('Updating role', [
-            'role_id' => $id,
-            'user_id' => auth()->id()
-        ]);
+        $role = $this->roleService->getRoleById($id);
 
-        $role = Role::findOrFail($id);
-        
-        $validated = $request->validate([
+        if (!$role) {
+            return back()->with('error', 'Role not found.');
+        }
+
+        $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:255',
                 Rule::unique('roles')->ignore($role->id)
             ],
+            'group' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:500'],
             'permissions' => ['required', 'array', 'min:1'],
             'permissions.*' => ['exists:permissions,id']
         ], [
@@ -135,56 +133,52 @@ class RoleController extends Controller
             'permissions.min' => 'Paling tidak pilih satu permission.'
         ]);
 
-        DB::beginTransaction();
-        
-        try {
-            // Update role name
-            $role->name = $validated['name'];
-            $role->save();
-            
-            // Sync permissions
-            $permissions = Permission::whereIn('id', $validated['permissions'])->pluck('name')->toArray();
-            $role->syncPermissions($permissions);
-            
-            DB::commit();
-            
-            // Log successful update
-            \Log::info('Role updated successfully', ['role_id' => $role->id]);
-            
-            return redirect()->route('admin.roles.index')
-                ->with('success', 'Role berhasil diperbarui.');
-                
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()
-                ->with('error', 'Failed to update role. Please try again.');
+        $roleData = [
+            'name' => $request->name,
+            'group' => $request->group,
+            'description' => $request->description,
+        ];
+
+        $success = $this->roleService->updateRole($id, $roleData);
+
+        if (!$success) {
+            return back()->with('error', 'Failed to update role.');
         }
+
+        // Sync permissions using service
+        $this->roleService->assignPermissions($id, $request->permissions);
+
+        return redirect()->route('admin.roles.index')
+            ->with('success', 'Role berhasil diperbarui.');
     }
 
     /**
      * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(int $id): RedirectResponse
     {
-        $role = Role::findOrFail($id);
-        
+        $role = $this->roleService->getRoleById($id);
+
+        if (!$role) {
+            return back()->with('error', 'Role not found.');
+        }
+
         // Prevent deleting admin role
         if ($role->name === 'admin') {
-            return redirect()->back()
-                ->with('error', 'Cannot delete admin role.');
+            return back()->with('error', 'Cannot delete admin role.');
         }
-        
+
         // Check if role is assigned to any user
         if ($role->users()->count() > 0) {
-            return redirect()->back()
-                ->with('error', 'Cannot delete role assigned to users.');
+            return back()->with('error', 'Cannot delete role assigned to users.');
         }
-        
-        $role->delete();
-        
+
+        $success = $this->roleService->deleteRole($id);
+
+        if (!$success) {
+            return back()->with('error', 'Failed to delete role.');
+        }
+
         return redirect()->route('admin.roles.index')
             ->with('success', 'Role deleted successfully.');
     }

@@ -23,11 +23,9 @@ class JadwalDonorController extends Controller
 
     public function show(int $id): View
     {
-        $schedule = $this->donationScheduleService->getScheduleById($id);
-        
-        if ($schedule->status !== 'published') {
-            abort(404);
-        }
+        $schedule = $this->donationScheduleService->getPublishedScheduleById($id);
+
+        abort_if(!$schedule, 404);
 
         return view('jadwal-donor.show', compact('schedule'));
     }

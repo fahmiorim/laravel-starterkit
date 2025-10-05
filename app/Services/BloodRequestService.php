@@ -9,6 +9,7 @@ use App\Models\BloodRequest;
 use App\Repositories\Contracts\BloodRequestRepositoryInterface;
 use App\Services\Contracts\BloodRequestServiceInterface;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -38,22 +39,23 @@ class BloodRequestService implements BloodRequestServiceInterface
 
     public function createRequest(array $data, int $processedBy): BloodRequest
     {
-        $data['processed_by'] = $processedBy;
-        $bloodRequestData = BloodRequestData::fromRequest(request());
-        
-        return DB::transaction(function () use ($bloodRequestData) {
-            $request = $this->repository->create(
-                $bloodRequestData->toArray()
-            );
-            
+        $dto = BloodRequestData::fromArray($data, $processedBy);
+
+        return DB::transaction(function () use ($dto) {
+            $request = $this->repository->create($dto->toArray());
+
             $this->dispatchEvents($request);
-            
+
             return $request;
         });
     }
 
     public function updateRequest(int $id, array $data): bool
     {
+        if (array_key_exists('required_date', $data) && $data['required_date']) {
+            $data['required_date'] = Carbon::parse($data['required_date']);
+        }
+
         return $this->repository->update($id, $data);
     }
 
@@ -66,17 +68,14 @@ class BloodRequestService implements BloodRequestServiceInterface
     {
         return DB::transaction(function () use ($id, $status, $processedBy) {
             $this->repository->updateStatus($id, $status, $processedBy);
-            
+
             $request = $this->getRequestById($id);
             $this->dispatchEvents($request, true);
-            
+
             return $request;
         });
     }
-    
-    /**
-     * Dispatch events for blood request
-     */
+
     protected function dispatchEvents(BloodRequest $request, bool $isStatusUpdate = false): void
     {
         if ($isStatusUpdate) {

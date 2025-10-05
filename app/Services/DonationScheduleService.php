@@ -88,6 +88,11 @@ class DonationScheduleService
         return $this->donationScheduleRepository->getPublishedSchedules($perPage);
     }
 
+    public function getPublishedScheduleById(int $id)
+    {
+        return $this->donationScheduleRepository->findPublishedById($id);
+    }
+
     protected function updateStatus(int $id, string $status)
     {
         try {

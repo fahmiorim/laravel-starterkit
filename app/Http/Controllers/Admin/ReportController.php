@@ -5,68 +5,78 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BloodRequest;
 use App\Models\Donor;
-use App\Models\DonorHistory;
-use App\Services\DonationScheduleService;
+use App\Services\Contracts\DashboardServiceInterface;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ReportController extends Controller
 {
-    protected $donationScheduleService;
+    public function __construct(
+        protected DashboardServiceInterface $dashboardService
+    ) {}
 
-    public function __construct(DonationScheduleService $donationScheduleService)
+    public function index(Request $request): View
     {
-        $this->donationScheduleService = $donationScheduleService;
-    }
-
-    public function index(): View
-    {
+        $period = $request->get('period', 'monthly');
         $currentYear = Carbon::now()->year;
         $currentMonth = Carbon::now()->month;
-        
-        // Get summary statistics
-        $summary = [
-            'total_donors' => Donor::count(),
-            'active_donors' => Donor::whereNotNull('last_donation_date')->count(),
-            'scheduled_events' => $this->donationScheduleService->getPublishedSchedules(1)->total(),
-            'donations_this_month' => DonorHistory::whereMonth('tanggal_donor', $currentMonth)
-                ->whereYear('tanggal_donor', $currentYear)
-                ->where('status', 'valid')
-                ->sum('jumlah_kantong'),
-            'blood_requests' => BloodRequest::count(),
-            'completed_requests' => BloodRequest::where('status', 'completed')->count(),
-        ];
 
-        // Blood type distribution
-        $bloodTypes = ['A', 'B', 'AB', 'O'];
-        $rhesusTypes = ['+', '-'];
-        $bloodTypeData = [];
-        
-        foreach ($bloodTypes as $type) {
-            foreach ($rhesusTypes as $rhesus) {
-                $count = Donor::where('blood_type', $type)
-                    ->where('rhesus', $rhesus)
-                    ->count();
-                $bloodTypeData["{$type}{$rhesus}"] = $count;
-            }
-        }
+        // Get statistics using service
+        $summary = $this->dashboardService->getReportStats($period);
 
-        // Monthly donations for the current year
-        $monthlyDonations = [];
-        for ($i = 1; $i <= 12; $i++) {
-            $monthlyDonations[Carbon::create()->month($i)->monthName] = DonorHistory::whereMonth('tanggal_donor', $i)
-                ->whereYear('tanggal_donor', $currentYear)
-                ->where('status', 'valid')
-                ->sum('jumlah_kantong');
-        }
+        // Get blood type distribution using service
+        $bloodTypeData = $this->dashboardService->getBloodTypeDistribution();
 
-        $recentRequests = BloodRequest::latest()->take(5)->get();
+        // Get donation trends using service
+        $donationTrends = $this->dashboardService->getDonationTrends(12);
 
         return view('admin.reports.index', compact(
-            'summary', 
-            'recentRequests', 
-            'bloodTypeData', 
-            'monthlyDonations'
+            'summary',
+            'bloodTypeData',
+            'donationTrends',
+            'period',
+            'currentYear',
+            'currentMonth'
         ));
+    }
+
+    /**
+     * Export report data
+     */
+    public function export(Request $request)
+    {
+        $period = $request->get('period', 'monthly');
+        $format = $request->get('format', 'pdf');
+
+        // Get data using service
+        $stats = $this->dashboardService->getReportStats($period);
+        $bloodTypeData = $this->dashboardService->getBloodTypeDistribution();
+        $trends = $this->dashboardService->getDonationTrends(12);
+
+        // Generate export based on format
+        if ($format === 'excel') {
+            return $this->exportToExcel($stats, $bloodTypeData, $trends, $period);
+        }
+
+        return $this->exportToPdf($stats, $bloodTypeData, $trends, $period);
+    }
+
+    /**
+     * Export to Excel format
+     */
+    private function exportToExcel($stats, $bloodTypeData, $trends, $period)
+    {
+        // Placeholder for Excel export implementation
+        return response()->json(['message' => 'Excel export not implemented yet']);
+    }
+
+    /**
+     * Export to PDF format
+     */
+    private function exportToPdf($stats, $bloodTypeData, $trends, $period)
+    {
+        // Placeholder for PDF export implementation
+        return response()->json(['message' => 'PDF export not implemented yet']);
     }
 }

@@ -3,25 +3,38 @@
 namespace App\Services;
 
 use App\Events\DonorCardCreated;
+use App\Models\Donor;
 use App\Models\DonorCard;
 use App\Repositories\Contracts\DonorCardRepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DonorCardService
 {
-    protected $donorCardRepository;
+    public function __construct(
+        protected DonorCardRepositoryInterface $donorCardRepository
+    ) {}
 
-    public function __construct(DonorCardRepositoryInterface $donorCardRepository)
+    public function getPaginatedCards(int $perPage = 15): LengthAwarePaginator
     {
-        $this->donorCardRepository = $donorCardRepository;
+        return $this->donorCardRepository->paginate($perPage);
     }
-    /**
-     * Generate a unique card number
-     *
-     * @return string
-     */
+
+    public function getDonorsWithoutCard(): Collection
+    {
+        return Donor::doesntHave('donorCard')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function getDonorCardById(int $id): ?DonorCard
+    {
+        return $this->donorCardRepository->find($id);
+    }
+
     public function generateCardNumber(): string
     {
         do {
@@ -31,82 +44,68 @@ class DonorCardService
         return $number;
     }
 
-    /**
-     * Generate and save QR code
-     *
-     * @param string $cardNumber
-     * @return string
-     */
     public function generateQrCode(string $cardNumber): string
     {
         $qrContent = route('donor-cards.show', ['donor_card' => $cardNumber]);
         $qrCode = QrCode::format('png')
             ->size(300)
             ->generate($qrContent);
-        
+
         $qrPath = 'donor-cards/qrcodes/' . Str::slug($cardNumber) . '.png';
         Storage::disk('public')->put($qrPath, $qrCode);
-        
+
         return $qrPath;
     }
 
-    /**
-     * Handle photo upload
-     *
-     * @param mixed $photo
-     * @return string
-     */
     public function uploadPhoto($photo): string
     {
         return $photo->store('donor-cards/photos', 'public');
     }
 
-    /**
-     * Create a new donor card
-     *
-     * @param array $data
-     * @return DonorCard
-     */
     public function createDonorCard(array $data): DonorCard
     {
         $data['card_number'] = $this->generateCardNumber();
         $data['status'] = 'active';
-        
+
         if (isset($data['photo'])) {
             $data['card_photo_path'] = $this->uploadPhoto($data['photo']);
             unset($data['photo']);
         }
-        
+
         $data['qr_code_path'] = $this->generateQrCode($data['card_number']);
-        
-$donorCard = $this->donorCardRepository->create($data);
-        
-        // Trigger event
+
+        $donorCard = $this->donorCardRepository->create($data);
+
         event(new DonorCardCreated($donorCard));
-        
+
         return $donorCard;
     }
 
-    /**
-     * Update an existing donor card
-     *
-     * @param DonorCard $donorCard
-     * @param array $data
-     * @return DonorCard
-     */
     public function updateDonorCard(DonorCard $donorCard, array $data): DonorCard
     {
         if (isset($data['photo'])) {
-            // Delete old photo if exists
             if ($donorCard->card_photo_path) {
                 Storage::disk('public')->delete($donorCard->card_photo_path);
             }
             $data['card_photo_path'] = $this->uploadPhoto($data['photo']);
             unset($data['photo']);
         }
-        
-$this->donorCardRepository->update($donorCard, $data);
-        
+
+        $this->donorCardRepository->update($donorCard, $data);
+
         return $this->donorCardRepository->find($donorCard->id);
+    }
+
+    public function deleteDonorCard(DonorCard $donorCard): bool
+    {
+        if ($donorCard->qr_code_path) {
+            Storage::disk('public')->delete($donorCard->qr_code_path);
+        }
+
+        if ($donorCard->card_photo_path) {
+            Storage::disk('public')->delete($donorCard->card_photo_path);
+        }
+
+        return $this->donorCardRepository->delete($donorCard);
     }
 }

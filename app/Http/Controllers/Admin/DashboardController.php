@@ -1,68 +1,35 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\BloodRequest;
-use App\Models\BloodStock;
-use App\Models\Donor;
-use App\Models\DonorHistory;
-use App\Models\User;
-use App\Services\DonationScheduleService;
-use Carbon\Carbon;
+use App\Services\Contracts\DashboardServiceInterface;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    protected $donationScheduleService;
+    protected DashboardServiceInterface $dashboardService;
 
-    public function __construct(DonationScheduleService $donationScheduleService)
+    public function __construct(DashboardServiceInterface $dashboardService)
     {
-        $this->donationScheduleService = $donationScheduleService;
+        $this->dashboardService = $dashboardService;
     }
 
     public function index(): View
     {
-        $now = Carbon::now();
-
-        // Get statistics
-        $stats = [
-            'totalUsers' => User::count(),
-            'totalDonors' => Donor::count(),
-            'activeDonors' => Donor::whereNotNull('last_donation_date')->count(),
-            'publishedSchedules' => $this->donationScheduleService->getPublishedSchedules(1)->total(),
-            'pendingRequests' => BloodRequest::where('status', 'pending')->count(),
-            'bloodStockBags' => BloodStock::sum('quantity'),
-            'donationsThisMonth' => DonorHistory::where('status', 'valid')
-                ->whereBetween('tanggal_donor', [
-                    $now->copy()->startOfMonth(),
-                    $now->copy()->endOfMonth()
-                ])
-                ->sum('jumlah_kantong'),
-        ];
-
-        // Get upcoming schedules using the service
-        $upcomingSchedules = $this->donationScheduleService->getUpcomingSchedules(5);
-
-        $recentRequests = BloodRequest::with('processor')
-            ->latest()
-            ->take(5)
-            ->get();
-
-        $recentHistories = DonorHistory::with('donor', 'schedule')
-            ->where('status', 'valid')
-            ->latest('tanggal_donor')
-            ->take(5)
-            ->get();
-
-        $lowStocks = BloodStock::orderBy('quantity')->take(4)->get();
+        $stats = $this->dashboardService->getDashboardStats();
+        $upcomingSchedules = $this->dashboardService->getUpcomingSchedules(5);
+        $recentRequests = $this->dashboardService->getRecentRequests(5);
+        $lowStocks = $this->dashboardService->getLowStock(5);
+        $recentHistories = $this->dashboardService->getRecentHistories(5);
+        $recentUsers = $this->dashboardService->getRecentUsers(5);
 
         return view('admin.dashboard.index', compact(
             'stats',
             'upcomingSchedules',
             'recentRequests',
+            'lowStocks',
             'recentHistories',
-            'lowStocks'
+            'recentUsers'
         ));
     }
 }

@@ -21,20 +21,20 @@ class DonorRepository implements DonorRepositoryInterface
 
     public function all(): Collection
     {
-        return $this->model->with(['bloodType', 'lastDonation'])->latest()->get();
+        return $this->model->with(['histories', 'lastDonation'])->latest()->get();
     }
 
     public function paginate(int $perPage = 15): LengthAwarePaginator
     {
         return $this->model
-            ->with(['bloodType', 'lastDonation'])
+            ->with(['histories', 'lastDonation'])
             ->latest()
             ->paginate($perPage);
     }
 
     public function find(int $id): ?Donor
     {
-        return $this->model->with(['bloodType', 'donationHistories'])->find($id);
+        return $this->model->with(['histories', 'lastDonation'])->find($id);
     }
 
     public function findByNik(string $nik): ?Donor
@@ -61,11 +61,11 @@ class DonorRepository implements DonorRepositoryInterface
     {
         $threeMonthsAgo = now()->subMonths(3);
         
-        return $this->model->whereDoesntHave('donationHistories', function (Builder $query) use ($threeMonthsAgo) {
-                $query->where('donation_date', '>=', $threeMonthsAgo);
+        return $this->model->whereDoesntHave('histories', function (Builder $query) use ($threeMonthsAgo) {
+                $query->where('tanggal_donor', '>=', $threeMonthsAgo);
             })
             ->where('status', 'active')
-            ->with(['bloodType', 'lastDonation'])
+            ->with(['lastDonation'])
             ->get();
     }
 
@@ -73,7 +73,7 @@ class DonorRepository implements DonorRepositoryInterface
     {
         return DonorHistory::where('donor_id', $donorId)
             ->with('bloodType')
-            ->latest('donation_date')
+            ->latest('tanggal_donor')
             ->limit($limit)
             ->get();
     }
@@ -83,16 +83,14 @@ class DonorRepository implements DonorRepositoryInterface
         return $this->model->where('name', 'like', "%{$query}%")
             ->orWhere('nik', 'like', "%{$query}%")
             ->orWhere('phone', 'like', "%{$query}%")
-            ->with(['bloodType', 'lastDonation'])
+            ->with(['lastDonation'])
             ->get();
     }
 
     public function getDonorsByBloodType(string $bloodType, string $rhesus): Collection
     {
-        return $this->model->whereHas('bloodType', function (Builder $query) use ($bloodType, $rhesus) {
-                $query->where('code', $bloodType)
-                    ->where('rhesus', $rhesus);
-            })
+        return $this->model->where('blood_type', $bloodType)
+            ->where('rhesus', $rhesus)
             ->where('status', 'active')
             ->with('lastDonation')
             ->get();
@@ -101,9 +99,9 @@ class DonorRepository implements DonorRepositoryInterface
     public function getLastDonationDate(int $donorId): ?string
     {
         $lastDonation = DonorHistory::where('donor_id', $donorId)
-            ->latest('donation_date')
+            ->latest('tanggal_donor')
             ->first();
 
-        return $lastDonation ? $lastDonation->donation_date : null;
+        return $lastDonation ? $lastDonation->tanggal_donor : null;
     }
 }

@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static array all()
  * @method static void forget(string $key)
  * @method static void save()
- * 
- * @see \App\Services\SettingService
+ *
+ * @see \App\Services\SettingsService
  */
 class Setting extends Facade
 {

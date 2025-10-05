@@ -3,131 +3,253 @@
 @section('title', 'Tambah Pendonor Baru')
 
 @section('content')
-<div class="p-4">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Tambah Pendonor Baru</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Lengkapi form di bawah untuk menambahkan pendonor baru</p>
-        </div>
-        <div class="mt-4 md:mt-0">
-            <a href="{{ route('admin.donors.index') }}" 
-               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                <i class="fas fa-arrow-left mr-2"></i> Kembali ke Daftar
-            </a>
-        </div>
-    </div>
-
-    @if($errors->any())
-        <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-md">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-exclamation-circle text-red-500 mt-1"></i>
+    <div class="p-6 max-w-4xl mx-auto">
+        <div class="mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div class="mb-4 sm:mb-0">
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Tambah Pendonor Baru</h1>
+                    <p class="text-gray-600 dark:text-gray-400">Lengkapi informasi di bawah untuk menambahkan pendonor baru
+                        ke dalam sistem</p>
                 </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan input</h3>
-                    <div class="mt-2 text-sm text-red-700">
-                        <ul class="list-disc pl-5 space-y-1">
-                            @foreach($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
+                <div>
+                    <a href="{{ route('admin.donors.index') }}"
+                        class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 shadow-sm hover:shadow-md">
+                        <i class="fas fa-arrow-left mr-2 text-gray-500"></i> Kembali ke Daftar
+                    </a>
                 </div>
             </div>
         </div>
-    @endif
 
-    <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Form Tambah Pendonor</h3>
-        </div>
+        @if ($errors->any())
+            <div class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-lg shadow-sm">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-500 mt-0.5"></i>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium text-red-800 dark:text-red-200">Terdapat kesalahan input</h3>
+                        <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+                            <ul class="space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li class="flex items-center">
+                                        <i class="fas fa-times-circle mr-2 text-xs"></i>
+                                        {{ $error }}
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
-        <form action="{{ route('admin.donors.store') }}" method="POST" class="divide-y divide-gray-200 dark:divide-gray-700">
-            @csrf
-            
-            <div class="px-6 py-6 space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div
+                class="px-8 py-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center">
+                    <div
+                        class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mr-4">
+                        <i class="fas fa-user-plus text-indigo-600 dark:text-indigo-400 text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Form Tambah Pendonor</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Pastikan semua informasi yang dimasukkan
+                            sudah benar</p>
+                    </div>
+                </div>
+            </div>
+
+            <form action="{{ route('admin.donors.store') }}" method="POST" id="donor-form" class="p-8 space-y-8">
+                @csrf
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Nama Lengkap -->
-                    <div class="col-span-1">
-                        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nama Lengkap <span class="text-red-500">*</span></label>
-                        <input type="text" name="name" id="name" value="{{ old('name') }}" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
-                    </div>
-                    
-                    <!-- NIK -->
-                    <div class="col-span-1">
-                        <label for="nik" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">NIK <span class="text-red-500">*</span></label>
-                        <input type="text" name="nik" id="nik" value="{{ old('nik') }}" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                    <div class="lg:col-span-2">
+                        <label for="name"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-user mr-2 text-indigo-500"></i>
+                            Nama Lengkap <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="name" id="name" value="{{ old('name') }}"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500"
+                                required>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                        </div>
                     </div>
 
-                                        <!-- Nomor KTA -->
-                    <div class="col-span-1">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nomor KTA</label>
-                        <div class="px-3 py-2 text-sm text-gray-600 bg-gray-100 border border-dashed border-gray-300 rounded-md dark:bg-gray-700/50 dark:border-gray-600 dark:text-gray-300">
-                            Nomor KTA akan dibuat otomatis setelah data disimpan.
+                    <!-- NIK -->
+                    <div>
+                        <label for="nik"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-id-card mr-2 text-indigo-500"></i>
+                            NIK <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="nik" id="nik" value="{{ old('nik') }}"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500"
+                                required>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-id-card text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nomor KTA -->
+                    <div>
+                        <label class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-credit-card mr-2 text-indigo-500"></i>
+                            Nomor KTA
+                        </label>
+                        <div
+                            class="relative px-12 py-3 bg-gray-50 dark:bg-gray-700/50 border-2 border-dashed border-gray-300 dark:border-gray-500 rounded-lg">
+                            <div class="flex items-center justify-center text-sm text-gray-600 dark:text-gray-300">
+                                <i class="fas fa-info-circle mr-2 text-gray-400"></i>
+                                Nomor KTA akan dibuat otomatis setelah data disimpan.
+                            </div>
                         </div>
                     </div>
 
                     <!-- Jenis Kelamin -->
-                    <div class="col-span-1">
-                        <label for="gender" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Jenis Kelamin <span class="text-red-500">*</span></label>
-                        <select name="gender" id="gender" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
-                            <option value="Laki-laki" {{ old('gender') == 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
-                            <option value="Perempuan" {{ old('gender') == 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
-                        </select>
+                    <div>
+                        <label for="gender"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-venus-mars mr-2 text-indigo-500"></i>
+                            Jenis Kelamin <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <select name="gender" id="gender"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500 appearance-none"
+                                required>
+                                <option value="Laki-laki" {{ old('gender') == 'Laki-laki' ? 'selected' : '' }}>Laki-laki
+                                </option>
+                                <option value="Perempuan" {{ old('gender') == 'Perempuan' ? 'selected' : '' }}>Perempuan
+                                </option>
+                            </select>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-venus-mars text-gray-400"></i>
+                            </div>
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Tanggal Lahir -->
-                    <div class="col-span-1">
-                        <label for="birth_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tanggal Lahir <span class="text-red-500">*</span></label>
-                        <input type="date" name="birth_date" id="birth_date" value="{{ old('birth_date') }}" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                    <div>
+                        <label for="birth_date"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-calendar-alt mr-2 text-indigo-500"></i>
+                            Tanggal Lahir <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="date" name="birth_date" id="birth_date" value="{{ old('birth_date') }}"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500"
+                                required>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-calendar-alt text-gray-400"></i>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Nomor Telepon -->
-                    <div class="col-span-1">
-                        <label for="phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nomor Telepon <span class="text-red-500">*</span></label>
-                        <input type="text" name="phone" id="phone" value="{{ old('phone') }}" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                    <div>
+                        <label for="phone"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-phone mr-2 text-indigo-500"></i>
+                            Nomor Telepon <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="phone" id="phone" value="{{ old('phone') }}"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500"
+                                required>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-phone text-gray-400"></i>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Golongan Darah -->
-                    <div class="col-span-1">
-                        <label for="blood_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Golongan Darah <span class="text-red-500">*</span></label>
-                        <select name="blood_type" id="blood_type" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
-                            <option value="A" {{ old('blood_type') == 'A' ? 'selected' : '' }}>A</option>
-                            <option value="B" {{ old('blood_type') == 'B' ? 'selected' : '' }}>B</option>
-                            <option value="AB" {{ old('blood_type') == 'AB' ? 'selected' : '' }}>AB</option>
-                            <option value="O" {{ old('blood_type') == 'O' ? 'selected' : '' }}>O</option>
-                        </select>
+                    <div>
+                        <label for="blood_type"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-tint mr-2 text-red-500"></i>
+                            Golongan Darah <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <select name="blood_type" id="blood_type"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500 appearance-none"
+                                required>
+                                <option value="A" {{ old('blood_type') == 'A' ? 'selected' : '' }}>A</option>
+                                <option value="B" {{ old('blood_type') == 'B' ? 'selected' : '' }}>B</option>
+                                <option value="AB" {{ old('blood_type') == 'AB' ? 'selected' : '' }}>AB</option>
+                                <option value="O" {{ old('blood_type') == 'O' ? 'selected' : '' }}>O</option>
+                            </select>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-tint text-gray-400"></i>
+                            </div>
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Rhesus -->
-                    <div class="col-span-1">
-                        <label for="rhesus" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rhesus <span class="text-red-500">*</span></label>
-                        <select name="rhesus" id="rhesus" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
-                            <option value="+" {{ old('rhesus') == '+' ? 'selected' : '' }}>+</option>
-                            <option value="-" {{ old('rhesus') == '-' ? 'selected' : '' }}>-</option>
-                        </select>
+                    <div>
+                        <label for="rhesus"
+                            class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-plus-circle mr-2 text-indigo-500"></i>
+                            Rhesus <span class="text-red-500 ml-1">*</span>
+                        </label>
+                        <div class="relative">
+                            <select name="rhesus" id="rhesus"
+                                class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500 appearance-none"
+                                required>
+                                <option value="+" {{ old('rhesus') == '+' ? 'selected' : '' }}>+ (Positif)</option>
+                                <option value="-" {{ old('rhesus') == '-' ? 'selected' : '' }}>- (Negatif)</option>
+                            </select>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-plus-circle text-gray-400"></i>
+                            </div>
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
+
                 <!-- Alamat -->
-                <div class="col-span-full">
-                    <label for="address" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Alamat <span class="text-red-500">*</span></label>
-                    <textarea name="address" id="address" rows="3" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>{{ old('address') }}</textarea>
+                <div>
+                    <label for="address"
+                        class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-map-marker-alt mr-2 text-indigo-500"></i>
+                        Alamat Lengkap <span class="text-red-500 ml-1">*</span>
+                    </label>
+                    <div class="relative">
+                        <textarea name="address" id="address" rows="4"
+                            class="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-500 resize-none"
+                            required>{{ old('address') }}</textarea>
+                        <div class="absolute top-3 left-3 pointer-events-none">
+                            <i class="fas fa-map-marker-alt text-gray-400"></i>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        
-            <!-- Form Actions -->
-            <div class="mt-8 p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
-                <button type="reset" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                    <i class="fas fa-undo-alt mr-2"></i> Reset
-                </button>
-                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                    <i class="fas fa-save mr-2"></i> Simpan Pendonor
-                </button>
-            </div>
-        </form>
+            </form>
+        </div>
+
+        <div
+            class="mt-8 flex justify-end space-x-4 sticky bottom-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 -mx-4">
+            <button type="reset" form="donor-form"
+                class="px-6 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 shadow-sm hover:shadow-md flex items-center">
+                <i class="fas fa-undo-alt mr-2"></i> Reset Form
+            </button>
+            <button type="submit"
+                class="inline-flex items-center px-6 py-3 border-2 border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                <i class="fas fa-save mr-2"></i> Simpan Pendonor
+            </button>
+        </div>
     </div>
-</div>
 @endsection
-
-
