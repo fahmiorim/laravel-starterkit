@@ -2,72 +2,73 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Reset cached roles and permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create permissions
         $permissions = [
-            'user_management_access',
-            'user_management_create',
-            'user_management_edit',
-            'user_management_delete',
-            'user_management_show',
-            'role_management_access',
-            'role_management_create',
-            'role_management_edit',
-            'role_management_delete',
-            'permission_management_access',
-            'permission_management_create',
-            'permission_management_edit',
-            'permission_management_delete',
-            'dashboard_access',
+            'view_users',
+            'manage_users',
+            'view_roles',
+            'manage_roles',
+            'view_permissions',
+            'manage_permissions',
+            'view_donors',
+            'manage_donors',
+            'print_kta',
+            'view_schedules',
+            'manage_schedules',
+            'publish_schedules',
+            'view_reports',
+            'export_reports',
+            'view_blood_stocks',
+            'manage_blood_stocks',
+            'view_blood_requests',
+            'manage_blood_requests',
+            'view_settings',
+            'manage_settings',
+            'view_own_history',
+            'register_for_donation',
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission], ['guard_name' => 'web']);
         }
 
-        // Create roles and assign created permissions
-        $adminRole = Role::create(['name' => 'admin']);
-        $adminRole->givePermissionTo(Permission::all());
+        $adminRole = Role::firstOrCreate(['name' => 'admin'], ['guard_name' => 'web']);
+        $adminRole->syncPermissions(Permission::all());
 
-        $userRole = Role::create(['name' => 'user']);
-        $userRole->givePermissionTo([
-            'dashboard_access',
-        ]);
+        $petugasRole = Role::firstOrCreate(['name' => 'petugas'], ['guard_name' => 'web']);
+        $petugasPermissions = [
+            'view_users',
+            'view_donors',
+            'manage_donors',
+            'print_kta',
+            'view_schedules',
+            'manage_schedules',
+            'publish_schedules',
+            'view_reports',
+            'export_reports',
+            'view_blood_stocks',
+            'manage_blood_stocks',
+            'view_blood_requests',
+            'manage_blood_requests',
+        ];
+        $petugasRole->syncPermissions($petugasPermissions);
 
-        // Create admin user
-        $admin = User::create([
-            'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password'),
-            'email_verified_at' => now(),
-        ]);
-
-        $admin->assignRole('admin');
-
-        // Create regular user
-        $user = User::create([
-            'name' => 'User',
-            'email' => 'user@example.com',
-            'password' => Hash::make('password'),
-            'email_verified_at' => now(),
-        ]);
-
-        $user->assignRole('user');
+        $donorRole = Role::firstOrCreate(['name' => 'pendonor'], ['guard_name' => 'web']);
+        $donorPermissions = [
+            'view_own_history',
+            'register_for_donation',
+            'view_schedules',
+        ];
+        $donorRole->syncPermissions($donorPermissions);
     }
 }

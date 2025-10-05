@@ -1,40 +1,55 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-50">
+<html lang="id" class="h-full">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'Dashboard' }} - {{ config('app.name', 'StarterKit') }}</title>
-    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @stack('styles')
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>@yield('title') - SIMPATI</title>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    @vite(['resources/css/app.css', 'resources/js/app.js'], 'defer')
+
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
+    <script>
+        const theme = (() => {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+                return localStorage.getItem('theme');
+            }
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                return 'dark';
+            }
+            return 'light';
+        })();
+
+        if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            document.documentElement.classList.add('dark');
+        }
+        window.localStorage.setItem('theme', theme);
+    </script>
 </head>
-<body class="h-full">
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div class="flex h-screen overflow-hidden">
-            <!-- Sidebar -->
+
+<body class="bg-gray-100 font-sans text-gray-800 h-full dark:bg-gray-800 dark:text-gray-200">
+    <div class="flex min-h-screen">
+        <div class="hidden lg:flex lg:flex-col">
             @include('admin.layouts.sidebar')
-            
-            <!-- Main Content -->
-            <div class="flex-1 flex flex-col overflow-hidden">
-                <!-- Navbar -->
-                @include('admin.layouts.navbar')
-                
-                <!-- Page Content -->
-                <main class="flex-1 overflow-y-auto p-4">
-                    @yield('content')
-                </main>
-                
-                <!-- Footer -->
-                @include('admin.layouts.footer')
-            </div>
+        </div>
+
+        <div class="flex flex-col flex-1">
+            @include('admin.layouts.navbar')
+
+            <main class="flex-1 overflow-y-auto dark:bg-gray-900">
+                @yield('content')
+            </main>
         </div>
     </div>
-    </div>
-
-    <!-- Scripts -->
-    <script src="{{ asset('assets/js/main.js') }}"></script>
-    @stack('scripts')
 </body>
+
 </html>

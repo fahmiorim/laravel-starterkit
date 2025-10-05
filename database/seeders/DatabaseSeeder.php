@@ -2,10 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,10 +11,24 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Run Seeders
+        // Run seeders in the correct order
         $this->call([
-            RolePermissionSeeder::class,
+            // 1. Create roles and permissions first
+            RoleAndPermissionSeeder::class,
+            // 2. Create users with assigned roles
+            UserSeeder::class,
+            // 3. Create system settings
             SettingsTableSeeder::class,
+            // 4. Create donors
+            DonorSeeder::class,
+            // 5. Create donation schedules
+            DonationScheduleSeeder::class,
+            // 6. Create blood stocks
+            BloodStockSeeder::class,
+            // 7. Create donor histories
+            DonorHistorySeeder::class,
+            // 8. Create blood requests
+            BloodRequestSeeder::class,
         ]);
     }
 }

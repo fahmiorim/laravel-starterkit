@@ -28,12 +28,19 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        // Redirect to admin dashboard if user is admin, otherwise to regular dashboard
-        if ($request->user()->hasRole('admin')) {
-            return redirect()->intended(route('admin.dashboard', [], false));
+        // Redirect based on user role
+        $user = $request->user();
+        
+        if ($user->hasRole('admin')) {
+            return redirect()->intended(route('admin.dashboard'));
         }
-
-        return redirect()->intended(route('dashboard', absolute: false));
+        
+        if ($user->hasRole('petugas')) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
+        
+        // For regular users (pendonor)
+        return redirect()->intended('/');
     }
 
     /**
@@ -50,3 +57,4 @@ class AuthenticatedSessionController extends Controller
         return redirect('/');
     }
 }
+
