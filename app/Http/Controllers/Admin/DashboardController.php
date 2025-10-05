@@ -5,43 +5,44 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BloodRequest;
 use App\Models\BloodStock;
-use App\Models\DonationSchedule;
 use App\Models\Donor;
 use App\Models\DonorHistory;
 use App\Models\User;
+use App\Services\DonationScheduleService;
 use Carbon\Carbon;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    protected $donationScheduleService;
+
+    public function __construct(DonationScheduleService $donationScheduleService)
+    {
+        $this->donationScheduleService = $donationScheduleService;
+    }
+
     public function index(): View
     {
         $now = Carbon::now();
 
+        // Get statistics
         $stats = [
             'totalUsers' => User::count(),
             'totalDonors' => Donor::count(),
             'activeDonors' => Donor::whereNotNull('last_donation_date')->count(),
-            'publishedSchedules' => DonationSchedule::where('status', 'published')->count(),
+            'publishedSchedules' => $this->donationScheduleService->getPublishedSchedules(1)->total(),
             'pendingRequests' => BloodRequest::where('status', 'pending')->count(),
             'bloodStockBags' => BloodStock::sum('quantity'),
             'donationsThisMonth' => DonorHistory::where('status', 'valid')
-                ->whereBetween('tanggal_donor', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])
+                ->whereBetween('tanggal_donor', [
+                    $now->copy()->startOfMonth(),
+                    $now->copy()->endOfMonth()
+                ])
                 ->sum('jumlah_kantong'),
         ];
 
-        $upcomingSchedules = DonationSchedule::where('status', 'published')
-            ->where('tanggal_mulai', '>=', $now)
-            ->orderBy('tanggal_mulai')
-            ->take(5)
-            ->get();
-
-        if ($upcomingSchedules->isEmpty()) {
-            $upcomingSchedules = DonationSchedule::where('status', 'published')
-                ->latest('tanggal_mulai')
-                ->take(5)
-                ->get();
-        }
+        // Get upcoming schedules using the service
+        $upcomingSchedules = $this->donationScheduleService->getUpcomingSchedules(5);
 
         $recentRequests = BloodRequest::with('processor')
             ->latest()

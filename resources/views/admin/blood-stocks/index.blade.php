@@ -8,22 +8,76 @@
         <div>
             <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Stok Darah</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-                Pantau dan perbarui stok darah. Masa simpan darah: 35 hari sejak tanggal donor.
+                Pantau dan kelola stok darah. Masa simpan darah: 35 hari sejak tanggal donor.
             </p>
         </div>
-        <div class="flex items-center space-x-2">
-            <span class="h-3 w-3 rounded-full bg-green-500"></span>
-            <span class="text-sm text-gray-600 dark:text-gray-400">Aktif</span>
-            <span class="h-3 w-3 rounded-full bg-amber-500 ml-2"></span>
-            <span class="text-sm text-gray-600 dark:text-gray-400">Akan Kadaluarsa</span>
-            <span class="h-3 w-3 rounded-full bg-red-500 ml-2"></span>
-            <span class="text-sm text-gray-600 dark:text-gray-400">Kadaluarsa</span>
+        <div class="flex flex-wrap items-center gap-4">
+            <a href="{{ route('admin.blood-stocks.create') }}" class="inline-flex items-center px-4 py-2 bg-primary-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-primary-700 focus:bg-primary-700 active:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Tambah Stok
+            </a>
+            <div class="flex items-center space-x-2">
+                <span class="h-3 w-3 rounded-full bg-green-500"></span>
+                <span class="text-sm text-gray-600 dark:text-gray-400">Aktif</span>
+                <span class="h-3 w-3 rounded-full bg-amber-500 ml-2"></span>
+                <span class="text-sm text-gray-600 dark:text-gray-400">Akan Kadaluarsa</span>
+                <span class="h-3 w-3 rounded-full bg-red-500 ml-2"></span>
+                <span class="text-sm text-gray-600 dark:text-gray-400">Kadaluarsa</span>
+            </div>
         </div>
     </div>
 
     @if(session('success'))
         <div class="px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-md">
             {{ session('success') }}
+        </div>
+    @endif
+    
+    @if(session('error'))
+        <div class="px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+            {{ session('error') }}
+        </div>
+    @endif
+    
+    @if($lowStocks->isNotEmpty())
+        <div class="bg-amber-50 border-l-4 border-amber-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-amber-700">
+                        <strong>Peringatan:</strong> Stok darah berikut ini sudah mencapai batas minimum:
+                        @foreach($lowStocks as $stock)
+                            {{ $stock->blood_type . $stock->rhesus }} ({{ $stock->quantity }} kantong){{ !$loop->last ? ',' : '' }}
+                        @endforeach
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+    
+    @if($expiringSoon->isNotEmpty())
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h2a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        <strong>Informasi:</strong> Stok darah berikut akan segera kadaluarsa:
+                        @foreach($expiringSoon as $stock)
+                            {{ $stock->blood_type . $stock->rhesus }} ({{ $stock->expiry_date->diffForHumans() }}){{ !$loop->last ? ',' : '' }}
+                        @endforeach
+                    </p>
+                </div>
+            </div>
         </div>
     @endif
 

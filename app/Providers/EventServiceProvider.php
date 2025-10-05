@@ -12,6 +12,32 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
+        'App\Events\DonorCardCreated' => [
+            'App\Listeners\SendDonorCardNotification',
+        ],
+        'App\Events\BloodStockLow' => [
+            'App\Listeners\SendLowStockNotification',
+        ],
+        'App\Events\BloodStockExpired' => [
+            'App\Listeners\SendExpiringStockNotification',
+        ],
+        \App\Events\DonationScheduleCreated::class => [
+            \App\Listeners\NotifyUsersAboutNewSchedule::class,
+        ],
+        \App\Events\DonationScheduleUpdated::class => [
+            // Add any listeners for update events if needed
+        ],
+        \App\Events\DonationScheduleStatusChanged::class => [
+            \App\Listeners\NotifyUsersAboutNewSchedule::class,
+        ],
+    ];
+
+    /**
+     * The subscriber classes to register.
+     *
+     * @var array
+     */
+    protected $subscribe = [
         //
     ];
 

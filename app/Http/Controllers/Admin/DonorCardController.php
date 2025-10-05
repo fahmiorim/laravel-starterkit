@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Http\Requests\DonorCardRequest;
 use App\Models\Donor;
 use App\Models\DonorCard;
+use App\Services\DonorCardService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\Facades\Image;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DonorCardController extends Controller
 {
@@ -40,38 +40,12 @@ class DonorCardController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(DonorCardRequest $request, DonorCardService $donorCardService)
     {
-        $validated = $request->validate([
-            'donor_id' => 'required|exists:donors,id|unique:donor_cards,donor_id',
-            'issue_date' => 'required|date',
-            'expiry_date' => 'required|date|after:issue_date',
-            'notes' => 'nullable|string',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
-        // Generate card number
-        $validated['card_number'] = DonorCard::generateCardNumber();
-        $validated['status'] = 'active';
-
-        // Handle photo upload
-        if ($request->hasFile('photo')) {
-            $path = $request->file('photo')->store('donor-cards/photos', 'public');
-            $validated['card_photo_path'] = $path;
-        }
-
-        // Generate QR Code
-        $qrContent = route('donor-cards.show', ['donor_card' => $validated['card_number']]);
-        $qrCode = QrCode::format('png')
-            ->size(300)
-            ->generate($qrContent);
-        
-        $qrPath = 'donor-cards/qrcodes/' . Str::slug($validated['card_number']) . '.png';
-        Storage::disk('public')->put($qrPath, $qrCode);
-        $validated['qr_code_path'] = $qrPath;
-
-        // Create donor card
-        $donorCard = DonorCard::create($validated);
+        $donorCard = $donorCardService->createDonorCard($request->validated());
 
         return redirect()
             ->route('admin.donor-cards.show', $donorCard)
@@ -99,34 +73,14 @@ class DonorCardController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, DonorCard $donorCard)
+    public function update(DonorCardRequest $request, DonorCard $donorCard, DonorCardService $donorCardService)
     {
-        $validated = $request->validate([
-            'issue_date' => 'required|date',
-            'expiry_date' => 'required|date|after:issue_date',
-            'status' => 'required|in:active,inactive,expired,revoked',
-            'notes' => 'nullable|string',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
-        // Handle photo upload
-        if ($request->hasFile('photo')) {
-            // Delete old photo if exists
-            if ($donorCard->card_photo_path) {
-                Storage::disk('public')->delete($donorCard->card_photo_path);
-            }
-            
-            $path = $request->file('photo')->store('donor-cards/photos', 'public');
-            $validated['card_photo_path'] = $path;
-        }
-
-        $donorCard->update($validated);
+        $donorCard = $donorCardService->updateDonorCard($donorCard, $request->validated());
 
         return redirect()
             ->route('admin.donor-cards.show', $donorCard)
             ->with('success', 'Kartu Donor berhasil diperbarui');
     }
-
     /**
      * Remove the specified resource from storage.
      */

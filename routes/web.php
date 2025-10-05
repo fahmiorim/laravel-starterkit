@@ -80,7 +80,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])
             ->name('donor-cards.download-pdf');
         
         // Blood Management
-        Route::resource('blood-stocks', BloodStockController::class)->only(['index', 'update']);
+        Route::resource('blood-stocks', BloodStockController::class);
         Route::resource('blood-requests', BloodRequestController::class);
         
         // Donation Schedules

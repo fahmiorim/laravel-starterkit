@@ -3,119 +3,145 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\BloodRequest;
-use App\Models\BloodStock;
+use App\Services\Contracts\BloodRequestServiceInterface;
 use App\Services\NotificationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class BloodRequestController extends Controller
 {
-    public function index(Request $request)
-    {
-        $requests = BloodRequest::with('processor')
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
-            ->latest()
-            ->paginate(15)
-            ->withQueryString();
-
-        return view('admin.blood-requests.index', compact('requests'));
+    public function __construct(
+        protected BloodRequestServiceInterface $bloodRequestService,
+        protected NotificationService $notificationService
+    ) {
+        $this->middleware('auth');
     }
 
-    public function create()
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(): View|JsonResponse
+    {
+        $bloodRequests = $this->bloodRequestService->getAllRequests();
+        
+        if (request()->wantsJson()) {
+            return response()->json($bloodRequests);
+        }
+        
+        return view('admin.blood-requests.index', compact('bloodRequests'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create(): View
     {
         return view('admin.blood-requests.create');
     }
 
-    public function store(Request $request, NotificationService $notificationService)
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request): JsonResponse
     {
-        $validated = $this->validatePayload($request);
-        $validated['processed_by'] = $request->user()->id;
+        $bloodRequest = $this->bloodRequestService->createRequest(
+            $request->all(),
+            $request->user()->id
+        );
 
-        $record = BloodRequest::create($validated);
+        return response()->json([
+            'message' => 'Blood request created successfully',
+            'data' => $bloodRequest
+        ], 201);
+    }
 
-        $notificationService->notifyBloodRequestStatus($record);
-
-        if (in_array($record->status, ['approved', 'completed'], true)) {
-            $this->reserveStock($record, $record->quantity);
+    /**
+     * Display the specified resource.
+     */
+    public function show(int $id): View
+    {
+        $bloodRequest = $this->bloodRequestService->getRequestById($id);
+        
+        if (!$bloodRequest) {
+            abort(404);
         }
 
-        return redirect()->route('admin.blood-requests.index')
-            ->with('success', 'Permintaan darah berhasil dicatat.');
+        return view('admin.blood-requests.show', compact('bloodRequest'));
     }
 
-    public function edit(BloodRequest $bloodRequest)
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, int $id): JsonResponse
     {
-        return view('admin.blood-requests.edit', compact('bloodRequest'));
-    }
+        $success = $this->bloodRequestService->updateRequest($id, $request->all());
 
-    public function update(Request $request, BloodRequest $bloodRequest, NotificationService $notificationService)
-    {
-        $validated = $this->validatePayload($request);
-
-        $validated['processed_by'] = $request->user()->id;
-        $previousStatus = $bloodRequest->status;
-
-        $bloodRequest->update($validated);
-
-        if (! in_array($previousStatus, ['approved', 'completed'], true)
-            && in_array($bloodRequest->status, ['approved', 'completed'], true)) {
-            $this->reserveStock($bloodRequest, $bloodRequest->quantity);
+        if (!$success) {
+            return response()->json([
+                'message' => 'Failed to update blood request'
+            ], 400);
         }
 
-        $notificationService->notifyBloodRequestStatus($bloodRequest);
-
-        return redirect()->route('admin.blood-requests.index')
-            ->with('success', 'Permintaan darah berhasil diperbarui.');
-    }
-
-    public function destroy(BloodRequest $bloodRequest)
-    {
-        $bloodRequest->delete();
-
-        return redirect()->route('admin.blood-requests.index')
-            ->with('success', 'Permintaan darah berhasil dihapus.');
-    }
-
-    protected function validatePayload(Request $request): array
-    {
-        return $request->validate([
-            'hospital_name' => ['required', 'string', 'max:255'],
-            'patient_name' => ['required', 'string', 'max:255'],
-            'blood_type' => ['required', Rule::in(['A', 'B', 'AB', 'O'])],
-            'rhesus' => ['required', Rule::in(['+', '-'])],
-            'quantity' => ['required', 'integer', 'min:1'],
-            'status' => ['required', Rule::in(['pending', 'approved', 'rejected', 'completed'])],
-            'notes' => ['nullable', 'string'],
+        return response()->json([
+            'message' => 'Blood request updated successfully'
         ]);
     }
 
-    protected function reserveStock(BloodRequest $record, int $requestedQuantity): void
+    /**
+     * Update the status of the specified resource.
+     */
+    public function updateStatus(Request $request, int $id): JsonResponse
     {
-        $stock = BloodStock::where('blood_type', $record->blood_type)
-            ->where('rhesus', $record->rhesus)
-            ->first();
+        $request->validate([
+            'status' => 'required|in:pending,processing,completed,rejected'
+        ]);
 
-        if (! $stock) {
-            return;
+        $bloodRequest = $this->bloodRequestService->updateRequestStatus(
+            $id,
+            $request->status,
+            $request->user()->id
+        );
+
+        return response()->json([
+            'message' => 'Blood request status updated successfully',
+            'data' => $bloodRequest
+        ]);
+    }
+
+    /**
+     * Get blood requests by status
+     */
+    public function getByStatus(string $status): JsonResponse
+    {
+        $requests = $this->bloodRequestService->getRequestsByStatus($status);
+        return response()->json($requests);
+    }
+
+    /**
+     * Get recent blood requests
+     */
+    public function getRecent(): JsonResponse
+    {
+        $requests = $this->bloodRequestService->getRecentRequests(5);
+        return response()->json($requests);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $success = $this->bloodRequestService->deleteRequest($id);
+
+        if (!$success) {
+            return response()->json([
+                'message' => 'Failed to delete blood request'
+            ], 400);
         }
 
-        $remaining = max(0, $stock->quantity - $requestedQuantity);
-
-        $stock->update([
-            'quantity' => $remaining,
-            'updated_by' => $record->processed_by,
+        return response()->json([
+            'message' => 'Blood request deleted successfully'
         ]);
     }
 }
-
-
-
-
-
-
-
-
-
-
-

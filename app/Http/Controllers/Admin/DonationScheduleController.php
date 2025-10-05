@@ -3,97 +3,117 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\DonationSchedule;
-use App\Models\User;
-use App\Services\NotificationService;
+use App\Http\Requests\DonationScheduleRequest;
+use App\Services\DonationScheduleService;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
 
 class DonationScheduleController extends Controller
 {
-    public function index()
+    protected $donationScheduleService;
+
+    public function __construct(DonationScheduleService $donationScheduleService)
     {
-        $schedules = DonationSchedule::latest()->paginate(10);
+        $this->donationScheduleService = $donationScheduleService;
+    }
+
+    public function index(): View
+    {
+        $schedules = $this->donationScheduleService->getPaginatedSchedules();
 
         return view('admin.schedules.index', compact('schedules'));
     }
 
-    public function create()
+    public function create(): View
     {
         return view('admin.schedules.create');
     }
 
-    public function store(Request $request)
+    public function store(DonationScheduleRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'judul' => 'required|string|max:255',
-            'deskripsi' => 'nullable|string',
-            'lokasi' => 'required|string|max:255',
-            'tanggal_mulai' => 'required|date',
-            'tanggal_selesai' => 'nullable|date|after_or_equal:tanggal_mulai',
-            'penanggung_jawab' => 'nullable|string|max:255',
-            'status' => 'required|in:draft,published,canceled',
-        ]);
+        try {
+            $data = $request->validated();
+            $this->donationScheduleService->createSchedule($data);
 
-        DonationSchedule::create($validated);
-
-        return redirect()->route('admin.schedules.index')
-            ->with('success', 'Jadwal donor darah berhasil ditambahkan.');
+            return redirect()
+                ->route('admin.schedules.index')
+                ->with('success', 'Jadwal donor darah berhasil ditambahkan.');
+        } catch (\Exception $e) {
+            Log::error('Error creating donation schedule: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menambahkan jadwal donor darah. Silakan coba lagi.');
+        }
     }
 
-    public function show(DonationSchedule $schedule)
+    public function show(int $id): View
     {
+        $schedule = $this->donationScheduleService->getScheduleById($id);
+
         return view('admin.schedules.show', compact('schedule'));
     }
 
-    public function edit(DonationSchedule $schedule)
+    public function edit(int $id): View
     {
+        $schedule = $this->donationScheduleService->getScheduleById($id);
+
         return view('admin.schedules.edit', compact('schedule'));
     }
 
-    public function update(Request $request, DonationSchedule $schedule)
+    public function update(DonationScheduleRequest $request, int $id): RedirectResponse
     {
-        $validated = $request->validate([
-            'judul' => 'required|string|max:255',
-            'deskripsi' => 'nullable|string',
-            'lokasi' => 'required|string|max:255',
-            'tanggal_mulai' => 'required|date',
-            'tanggal_selesai' => 'nullable|date|after_or_equal:tanggal_mulai',
-            'penanggung_jawab' => 'nullable|string|max:255',
-            'status' => 'required|in:draft,published,canceled',
-        ]);
+        try {
+            $data = $request->validated();
+            $this->donationScheduleService->updateSchedule($id, $data);
 
-        $schedule->update($validated);
-
-        return redirect()->route('admin.schedules.index')
-            ->with('success', 'Jadwal donor darah berhasil diperbarui.');
-    }
-
-    public function destroy(DonationSchedule $schedule)
-    {
-        $schedule->delete();
-
-        return redirect()->route('admin.schedules.index')
-            ->with('success', 'Jadwal donor darah berhasil dihapus.');
-    }
-
-    public function publish(DonationSchedule $schedule, NotificationService $notificationService)
-    {
-        $schedule->update(['status' => 'published']);
-
-        $recipients = User::role('pendonor')->get();
-        if ($recipients->isNotEmpty()) {
-            $notificationService->notifySchedulePublished($recipients, $schedule);
+            return redirect()
+                ->route('admin.schedules.show', $id)
+                ->with('success', 'Jadwal donor darah berhasil diperbarui.');
+        } catch (\Exception $e) {
+            Log::error('Error updating donation schedule: ' . $e->getMessage());
+            return back()->with('error', 'Gagal memperbarui jadwal donor darah. Silakan coba lagi.');
         }
-
-        return redirect()->route('admin.schedules.index')
-            ->with('success', 'Jadwal donor darah berhasil dipublikasikan.');
     }
 
-    public function cancel(DonationSchedule $schedule)
+    public function destroy(int $id): RedirectResponse
     {
-        $schedule->update(['status' => 'canceled']);
+        try {
+            $this->donationScheduleService->deleteSchedule($id);
 
-        return redirect()->route('admin.schedules.index')
-            ->with('success', 'Jadwal donor darah berhasil dibatalkan.');
+            return redirect()
+                ->route('admin.schedules.index')
+                ->with('success', 'Jadwal donor darah berhasil dihapus.');
+        } catch (\Exception $e) {
+            Log::error('Error deleting donation schedule: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menghapus jadwal donor darah. Silakan coba lagi.');
+        }
+    }
+
+    public function publish(int $id): RedirectResponse
+    {
+        try {
+            $schedule = $this->donationScheduleService->publishSchedule($id);
+
+            return redirect()
+                ->route('admin.schedules.show', $schedule->id)
+                ->with('success', 'Jadwal donor darah berhasil dipublikasikan.');
+        } catch (\Exception $e) {
+            Log::error('Error publishing schedule: ' . $e->getMessage());
+            return back()->with('error', 'Gagal mempublikasikan jadwal. Silakan coba lagi.');
+        }
+    }
+
+    public function cancel(int $id): RedirectResponse
+    {
+        try {
+            $schedule = $this->donationScheduleService->cancelSchedule($id);
+
+            return redirect()
+                ->route('admin.schedules.show', $schedule->id)
+                ->with('success', 'Jadwal donor darah berhasil dibatalkan.');
+        } catch (\Exception $e) {
+            Log::error('Error canceling schedule: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan jadwal. Silakan coba lagi.');
+        }
     }
 }
